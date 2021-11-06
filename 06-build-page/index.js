@@ -9,19 +9,20 @@ const regexp = /{{[a-z]+}}/g;
 const readableStream = fs.createReadStream(template, 'utf-8');
 const writableStream = fs.createWriteStream(htmlFile, 'utf-8');
 
-const buildPage = async() => {
-    await createFolder(projectFolder);
-    await formHTML();
-    await createStyleBundle();
-    await copyAssetsFolder();
+const buildPage = () => {
+    createFolder(projectFolder);
+    formHTML();
+    createStyleBundle();
+    createFolder(pathToNewFolder);
+    copyFolderContent(pathToExistingFolder, pathToNewFolder);
 }
 
-const createFolder = async(nameFolder) => {
-    await fsPromises.mkdir(nameFolder, { recursive: true });
+const createFolder = (nameFolder) => {
+    fs.mkdir(nameFolder, { recursive: true }, () => {
+    });
 }
 
 const formHTML = () => {
-    let markdown = ''; 
     let array = [];
     let tagContent = '';
     readableStream.on('data', (chunk) => {
@@ -68,47 +69,21 @@ const createStyleBundle = () => {
     });
 }
 
-const copyAssetsFolder = () => {
-    const pathToExistingFolder = path.join(__dirname, 'assets');
-    const pathToNewFolder = path.join(__dirname, 'project-dist', 'assets');
+const pathToExistingFolder = path.join(__dirname, 'assets');
+const pathToNewFolder = path.join(__dirname, 'project-dist', 'assets'); 
 
-    fs.readdir(pathToNewFolder, { withFileTypes: true }, (err, files) => {
-        if (files) {
-            files.forEach(file => {
-                fs.rm(path.join(pathToNewFolder, file.name), (err) => {
-                    if (err) throw err;
-                });
+const copyFolderContent = (oldfolder, newfolder) => {
+   fs.readdir(oldfolder, { withFileTypes: true, recursive: true }, (err, items) => {
+            items.forEach(item => {
+                if (item.isDirectory()) {
+                    createFolder(path.join(newfolder, item.name));
+                    copyFolderContent(path.join(oldfolder, item.name), path.join(newfolder, item.name));
+                } else {
+                    fs.copyFile(path.join(oldfolder, item.name), path.join(newfolder, item.name), (err) => {
+                        if (err) throw err;
+                    });
+                }
             });
-        };
-    });
-
-    fsPromises.mkdir(pathToNewFolder, { recursive: true })
-        .then(function () {
-            fs.readdir(pathToExistingFolder, { withFileTypes: true }, (err, files) => {
-                files.forEach(file => {
-                    if (file.isFile()) {
-                        fs.copyFile(path.join(pathToExistingFolder, file.name), path.join(pathToNewFolder, file.name), (err) => {
-                            if (err) throw err;
-                        });
-                    } else {
-                        const pathToExistingSubFolder = path.join(__dirname, 'assets', file.name);
-                        const pathToNewSubFolder = path.join(__dirname, 'project-dist', 'assets', file.name);
-                        fsPromises.mkdir(pathToNewSubFolder, { recursive: true })
-                             .then(function () {
-                                fs.readdir(pathToExistingSubFolder, { withFileTypes: true }, (err, files) => {
-                                    files.forEach(file => {
-                                        fs.copyFile(path.join(pathToExistingSubFolder, file.name), path.join(pathToNewSubFolder, file.name), (err) => {
-                                            if (err) throw err;
-                                        });
-                                    });
-                                });        
-                        });
-                    }
-                });
-            });
-        })
-        .catch(function () {
-            console.log('failed to create directory');
         });
 }
 
